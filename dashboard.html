@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Running Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+  .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+  .card:hover { border-color: rgba(255,255,255,0.18); }
+  .tab-active { background: #1f2937; color: #fff; border-bottom: 2px solid #3b82f6; }
+  .zone-E { background-color: #3B82F6; }
+  .zone-M { background-color: #10B981; }
+  .zone-T { background-color: #EAB308; }
+  .zone-I { background-color: #F97316; }
+  .zone-R { background-color: #EF4444; }
+  .zone-Rest { background-color: #374151; }
+  .zone-X { background-color: #8B5CF6; }
+  .zone-Race { background: linear-gradient(135deg, #F59E0B, #EF4444); }
+  .ring { transform: rotate(-90deg); }
+  .calendar-day { min-height: 70px; }
+  @media (max-width: 640px) { .calendar-day { min-height: 54px; } }
+</style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+
+<div class="max-w-6xl mx-auto px-4 py-6">
+
+  <!-- HEADER -->
+  <header class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+    <div>
+      <h1 class="text-3xl sm:text-4xl font-bold tracking-tight">Running</h1>
+      <p id="header-subtitle" class="text-gray-400 text-sm mt-1"></p>
+    </div>
+    <div class="text-right">
+      <div id="vdot-big" class="text-4xl font-bold text-blue-400"></div>
+      <div class="text-xs text-gray-500 uppercase tracking-wide">Current VDOT</div>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <nav class="flex border-b border-gray-800 mb-6 overflow-x-auto">
+    <button data-tab="dashboard" class="tab-btn px-5 py-3 font-medium text-sm whitespace-nowrap">Dashboard</button>
+    <button data-tab="calendar" class="tab-btn px-5 py-3 font-medium text-sm whitespace-nowrap">Calendar</button>
+    <button data-tab="plan" class="tab-btn px-5 py-3 font-medium text-sm whitespace-nowrap">Plan</button>
+    <button data-tab="metrics" class="tab-btn px-5 py-3 font-medium text-sm whitespace-nowrap">Metrics</button>
+    <button data-tab="training" class="tab-btn px-5 py-3 font-medium text-sm whitespace-nowrap">Training</button>
+  </nav>
+
+  <!-- DASHBOARD TAB -->
+  <section id="tab-dashboard" class="tab-panel">
+
+    <!-- Race countdown cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" id="races-grid"></div>
+
+    <!-- This week -->
+    <div class="card rounded-xl p-5 mb-6">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h2 class="text-lg font-semibold">This week</h2>
+          <p class="text-xs text-gray-500" id="week-subtitle"></p>
+        </div>
+        <div class="flex items-center gap-6">
+          <div class="text-right">
+            <div class="text-xs text-gray-500">Sessions</div>
+            <div class="font-semibold text-lg" id="week-sessions"></div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-500">km planned</div>
+            <div class="font-semibold text-lg" id="week-km"></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-7 gap-1 sm:gap-2" id="week-days"></div>
+    </div>
+
+    <!-- Next sessions -->
+    <div class="card rounded-xl p-5 mb-6">
+      <h2 class="text-lg font-semibold mb-4">Next up</h2>
+      <div id="next-sessions" class="space-y-3"></div>
+    </div>
+
+    <!-- Weekly volume chart -->
+    <div class="card rounded-xl p-5 mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-semibold">Weekly volume</h2>
+        <div class="text-xs text-gray-500" id="volume-meta"></div>
+      </div>
+      <div class="relative h-56">
+        <canvas id="chart-volume"></canvas>
+      </div>
+    </div>
+
+    <!-- Recent activities -->
+    <div class="card rounded-xl p-5">
+      <h2 class="text-lg font-semibold mb-4">Recent runs</h2>
+      <div id="recent-activities" class="divide-y divide-gray-800"></div>
+    </div>
+
+  </section>
+
+  <!-- CALENDAR TAB -->
+  <section id="tab-calendar" class="tab-panel hidden">
+    <div class="card rounded-xl p-5">
+      <h2 id="calendar-title" class="text-lg font-semibold mb-4"></h2>
+      <div class="grid grid-cols-7 text-xs text-gray-500 mb-2">
+        <div class="text-center py-1">Mon</div>
+        <div class="text-center py-1">Tue</div>
+        <div class="text-center py-1">Wed</div>
+        <div class="text-center py-1">Thu</div>
+        <div class="text-center py-1">Fri</div>
+        <div class="text-center py-1">Sat</div>
+        <div class="text-center py-1">Sun</div>
+      </div>
+      <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
+      <div class="mt-5 flex flex-wrap gap-2 text-xs">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded zone-E"></span>Easy</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded zone-M"></span>Marathon</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded zone-T"></span>Threshold</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded zone-I"></span>Interval</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded zone-R"></span>Rep</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded zone-X"></span>Cross</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded zone-Race"></span>Race</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLAN TAB -->
+  <section id="tab-plan" class="tab-panel hidden">
+    <div class="card rounded-xl p-5 mb-6" id="plan-overview"></div>
+    <div id="plan-weeks" class="space-y-3"></div>
+  </section>
+
+  <!-- METRICS TAB -->
+  <section id="tab-metrics" class="tab-panel hidden">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div class="card rounded-xl p-5">
+        <h2 class="text-lg font-semibold mb-2">VDOT trend</h2>
+        <div class="relative h-56">
+          <canvas id="chart-vdot"></canvas>
+        </div>
+      </div>
+      <div class="card rounded-xl p-5">
+        <h2 class="text-lg font-semibold mb-2">Pace zones</h2>
+        <div id="pace-zones" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <div class="card rounded-xl p-5 mb-6">
+      <h2 class="text-lg font-semibold mb-2">Predicted race times</h2>
+      <div id="predicted-times" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+    </div>
+
+    <div class="card rounded-xl p-5">
+      <h2 class="text-lg font-semibold mb-2">Recent PBs</h2>
+      <div id="pbs" class="text-sm text-gray-500">PB detection runs on ingested activities. Populates once FIT files are dropped into Raw/FIT/ and /running-sync runs.</div>
+    </div>
+
+  </section>
+
+  <!-- TRAINING TAB -->
+  <section id="tab-training" class="tab-panel hidden">
+    <div class="card rounded-xl p-5 mb-4">
+      <h2 class="text-lg font-semibold">Training sessions</h2>
+      <p class="text-sm text-gray-400 mt-1">Detailed workout breakdowns. Every session has a <strong>Why</strong>, structure, coaching cues and sources so you can trust the protocol. Edit <code class="text-xs bg-gray-800 px-1 py-0.5 rounded">Running/Workouts.md</code> in Obsidian to add new workouts — they appear here on next publish.</p>
+    </div>
+    <div id="workouts-list" class="space-y-4"></div>
+  </section>
+
+  <!-- Activity detail modal -->
+  <div id="act-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden p-4">
+    <div class="card rounded-xl p-6 w-full max-w-sm relative">
+      <button onclick="closeActModal()" class="absolute top-3 right-3 text-gray-400 hover:text-white text-xl leading-none">×</button>
+      <div id="act-modal-content"></div>
+    </div>
+  </div>
+
+  <footer class="mt-10 text-center text-xs text-gray-600">
+    <span id="footer-meta"></span>
+  </footer>
+
+</div>
+
+<!-- DATA + RENDER LOGIC -->
+<script>
+const DATA = /*<<DATA>>*/{"meta":{"generated_at":"2026-04-18T10:19:55","date":"2026-04-18","date_display":"Saturday 18 April 2026","vdot":44,"paces":{"E":"5:25\u20136:08","M":"4:55","T":"4:45","I":"4:22","R_400":"4:04"}},"races":[{"title":"HOKA Runaway Sydney Half Marathon 2026","date":"2026-05-03","date_display":"Sun 03 May 2026","distance":"HM","priority":"C","days":15,"is_past":false,"predicted":"1:43:44"},{"title":"Parramatta Half Marathon 2026","date":"2026-06-21","date_display":"Sun 21 Jun 2026","distance":"HM","priority":"A","days":64,"is_past":false,"predicted":"1:43:44"}],"this_week":{"title":"Week 01 \u2014 Sharpen Block (Week -2, HOKA)","phase":"Sharpen block (race-into-fitness)","week_of":"2026-04-20","week_end":"2026-04-26","days":[{"day":"Mon","day_long":"Monday","date":"2026-04-20","date_display":"20 Apr","planned":"Rest","session":"Rest","distance":"\u2014","pace":"\u2014","has_session":false,"status":"upcoming-rest","actual":null,"workout_slug":null},{"day":"Tue","day_long":"Tuesday","date":"2026-04-21","date_display":"21 Apr","planned":"Key Run 1 \u2014 Goal pace touch \u2014 ~8\u20139 km","session":"Key Run 1 \u2014 Goal pace touch","distance":"~8\u20139 km","pace":"Mixed","has_session":true,"status":"upcoming","actual":null,"workout_slug":"goal-pace-touch"},{"day":"Wed","day_long":"Wednesday","date":"2026-04-22","date_display":"22 Apr","planned":"Cross-train \u2014 30 min","session":"Cross-train","distance":"30 min","pace":"Aerobic","has_session":true,"status":"upcoming","actual":null,"workout_slug":"cross-training"},{"day":"Thu","day_long":"Thursday","date":"2026-04-23","date_display":"23 Apr","planned":"Key Run 2 \u2014 Short intervals \u2014 ~10 km","session":"Key Run 2 \u2014 Short intervals","distance":"~10 km","pace":"Mixed","has_session":true,"status":"upcoming","actual":null,"workout_slug":"short-intervals"},{"day":"Fri","day_long":"Friday","date":"2026-04-24","date_display":"24 Apr","planned":"Rest","session":"Rest","distance":"\u2014","pace":"\u2014","has_session":false,"status":"upcoming-rest","actual":null,"workout_slug":null},{"day":"Sat","day_long":"Saturday","date":"2026-04-25","date_display":"25 Apr","planned":"Long run \u2014 Easy \u2014 14 km","session":"Long run \u2014 Easy","distance":"14 km","pace":"E pace: 5:25\u20136:08","has_session":true,"status":"upcoming","actual":null,"workout_slug":"long-run"},{"day":"Sun","day_long":"Sunday","date":"2026-04-26","date_display":"26 Apr","planned":"Rest","session":"Rest","distance":"\u2014","pace":"\u2014","has_session":false,"status":"upcoming-rest","actual":null,"workout_slug":null}],"planned_km":33.0,"actual_km":0.0,"sessions_done":0,"sessions_planned":4},"next_sessions":[{"date":"2026-04-21","date_display":"Tue 21 Apr","day":"Tue","session":"Key Run 1 \u2014 Goal pace touch","distance":"~8\u20139 km","pace":"Mixed","workout_slug":"goal-pace-touch"},{"date":"2026-04-22","date_display":"Wed 22 Apr","day":"Wed","session":"Cross-train","distance":"30 min","pace":"Aerobic","workout_slug":"cross-training"},{"date":"2026-04-23","date_display":"Thu 23 Apr","day":"Thu","session":"Key Run 2 \u2014 Short intervals","distance":"~10 km","pace":"Mixed","workout_slug":"short-intervals"},{"date":"2026-04-25","date_display":"Sat 25 Apr","day":"Sat","session":"Long run \u2014 Easy","distance":"14 km","pace":"E pace: 5:25\u20136:08","workout_slug":"long-run"}],"plan":{"overview":{"target_race":"Parramatta Half Marathon 2026","race_date":"2026-06-21","body":"**Immediate target:** HOKA Runaway Sydney HM \u2014 May 3, 2026 (C-race, sharpen block, 16 days out)\n**A-race target:** Parramatta Half Marathon \u2014 June 21, 2026 (9.3 weeks from today)\n\nTwo-phase structure:\n1. Sharpen block for HOKA (now to May 3) \u2014 C-race, no build, race-into-fitness\n2. Real periodised build for Parramatta (May 4 to June 21 \u2014 7 weeks)\n\nMethodology: Jack Daniels' periodisation on FIRST 3+2 structure (3 key runs/week + home KB cross-training).\n\nVDOT: **44**. Pace zones: [Pace Zones](../Pace%20Zones.md).\nVDOT recalculates after HOKA \u2014 Parramatta build paces update then.\n\n---","part1":"| Week | Dates | Phase | Key Run 1 | Key Run 2 | Long Run | Planned km |\n|---|---|---|---|---|---|---|\n| Return | Apr 13\u201319 | Easy return | Easy \u2014 April 16 done \u2713 | Optional easy | Optional easy | ~15 |\n| Week 01 | Apr 20\u201326 | Sharpen -2 | 4E + 2\u20133 km @ 4:44\u20134:49 + 2E | 6E + 4\u00d7400m @ 4:22 + 2E | 14 km easy | ~34 |\n| Week 02 | Apr 27\u2013May 3 | Race week | 5 km + 2 km @ goal pace | 6E + 4\u00d730s strides | \u2014 (race is long effort) | ~10 + race |\n\nWeek 01 detail: [Plan/Week 01](Week%2001.md) \u2190 current week\nWeek 02: generated by `/running-sync`\n\n---","part2":"7 weeks post-HOKA. HOKA provides the aerobic base \u2014 Foundation phase is abbreviated.\nFull week detail generated by `/running-replan` after HOKA result is logged. Paces update once VDOT recalculates.\n\n| Week | Dates | Phase | Key Run 1 | Key Run 2 | Long Run | Planned km |\n|---|---|---|---|---|---|---|\n| W03 | May 4\u201310 | Recovery / Foundation | Easy 8 km | Easy 6 km | Easy 12 km | ~26 |\n| W04 | May 11\u201317 | Early Quality | 2E + 8\u00d7400m R + 2E | 2E + 15 min T + 2E | Easy 14 km + last 2 km M | ~33 |\n| W05 | May 18\u201324 | Early Quality | 2E + 8\u00d7400m R + 2E | 2E + 20 min T + 2E | Easy 16 km + last 3 km M | ~36 |\n| W06 | May 25\u201331 | Race-Specific | 2E + 4\u00d71 km T (60s) + 2E | 2E + 8 km @ HM goal pace + 2E | 16 km with 6 km M/HM mid | ~38 |\n| W07 | Jun 1\u20137 | Race-Specific | 2E + 5\u00d71 km T (60s) + 2E | 2E + 10 km @ HM goal pace + 2E | 18 km with 8 km HM mid | ~40 |\n| W08 | Jun 8\u201314 | Taper | 2E + 3\u00d71 km T + 2E | 6\u20138 km with 3 km @ HM pace | 12\u201314 km easy | ~28 |\n| W09 | Jun 15\u201321 | Race week | 2E + 2\u00d71 km T + 2E | 5 km with 3 km @ HM pace | \u2014 (race day) | ~8 + race |\n| RACE | Jun 21 | Parramatta HM | \u2014 | \u2014 | **Race day** | 21.1 |\n\n*Paces marked above are at current VDOT 44. Expect upward shift after HOKA \u2014 replan will update all paces.*\n\n---"},"weeks":[{"title":"Week 01 \u2014 Sharpen Block (Week -2, HOKA)","phase":"Sharpen block (race-into-fitness)","week_of":"2026-04-20","week_of_display":"20 Apr","week_end_display":"26 Apr","planned_km":33.0,"sessions":[{"day":"Tue","session":"Key Run 1 \u2014 Goal pace touch","distance":"~8\u20139 km","pace":"Mixed","workout_slug":"goal-pace-touch"},{"day":"Wed","session":"Cross-train","distance":"30 min","pace":"Aerobic","workout_slug":"cross-training"},{"day":"Thu","session":"Key Run 2 \u2014 Short intervals","distance":"~10 km","pace":"Mixed","workout_slug":"short-intervals"},{"day":"Sat","session":"Long run \u2014 Easy","distance":"14 km","pace":"E pace: 5:25\u20136:08","workout_slug":"long-run"}],"is_current":false,"is_past":false}]},"weekly_volumes":{"labels":["W07","W08","W09","W10","W11","W12","W13","W14","W15","W16"],"values":[0.8,21.3,28.7,6.1,22.1,21.4,8.3,6.3,21.0,8.2],"source":"Account Export CSV (bootstrap)","total_km":144.2,"avg_km":14.4,"weeks_count":10},"vdot_history":{"labels":["2026-04-18"],"values":[44],"current":44},"activities":[{"date":"2026-04-16","date_display":"Thu 16 Apr","type":"intervals","distance_km":8.21,"pace":"6:50/km","hr":"150","elapsed":"1:19:54"}],"calendar":{"year":2026,"month":4,"month_display":"April 2026","days":[{"date":"2026-03-30","day_num":30,"in_month":false,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-03-31","day_num":31,"in_month":false,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-01","day_num":1,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-02","day_num":2,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-03","day_num":3,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-04","day_num":4,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-05","day_num":5,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-06","day_num":6,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-07","day_num":7,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-08","day_num":8,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-09","day_num":9,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-10","day_num":10,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-11","day_num":11,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-12","day_num":12,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-13","day_num":13,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-14","day_num":14,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-15","day_num":15,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-16","day_num":16,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":{"distance_km":8.21,"type":"intervals","pace":"6:50/km","elapsed":"1:19:54","hr":"150","date_display":"16 April"}},{"date":"2026-04-17","day_num":17,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-18","day_num":18,"in_month":true,"is_today":true,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-19","day_num":19,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-20","day_num":20,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-21","day_num":21,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":{"session":"Key Run 1 \u2014 Goal pace touch","distance":"~8\u20139 km","pace":"Mixed","day":"Tue","workout_slug":"goal-pace-touch"},"actual":null},{"date":"2026-04-22","day_num":22,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":{"session":"Cross-train","distance":"30 min","pace":"Aerobic","day":"Wed","workout_slug":"cross-training"},"actual":null},{"date":"2026-04-23","day_num":23,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":{"session":"Key Run 2 \u2014 Short intervals","distance":"~10 km","pace":"Mixed","day":"Thu","workout_slug":"short-intervals"},"actual":null},{"date":"2026-04-24","day_num":24,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-25","day_num":25,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":{"session":"Long run \u2014 Easy","distance":"14 km","pace":"E pace: 5:25\u20136:08","day":"Sat","workout_slug":"long-run"},"actual":null},{"date":"2026-04-26","day_num":26,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-27","day_num":27,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-28","day_num":28,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-29","day_num":29,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-04-30","day_num":30,"in_month":true,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-05-01","day_num":1,"in_month":false,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-05-02","day_num":2,"in_month":false,"is_today":false,"is_race":false,"race_title":null,"planned":null,"actual":null},{"date":"2026-05-03","day_num":3,"in_month":false,"is_today":false,"is_race":true,"race_title":"HOKA Runaway Sydney Half Marathon 2026","planned":null,"actual":null}],"prev_month_display":"March 2026","next_month_display":"May 2026"},"pbs":[],"pace_zones":[{"code":"E","label":"Easy","pace":"5:25\u20136:08","colour":"#3B82F6","use":"Recovery, long runs, aerobic base"},{"code":"M","label":"Marathon","pace":"4:55","colour":"#10B981","use":"Marathon pace, long run finishes"},{"code":"T","label":"Threshold","pace":"4:45","colour":"#EAB308","use":"Tempo runs, lactate threshold"},{"code":"I","label":"Interval","pace":"4:22","colour":"#F97316","use":"VO2max intervals (3\u20135 min)"},{"code":"R","label":"Repetition","pace":"4:04/400","colour":"#EF4444","use":"Speed, neuromuscular (30s\u201390s)"}],"workouts":[{"slug":"easy-run","name":"Easy run","category":"Recovery / aerobic","zones":"E","duration":"30\u201375 min","why":"E pace builds the aerobic base \u2014 mitochondrial density, capillarisation, muscular endurance \u2014 without significant stress. Daniels' data puts E pace at **65\u201378% of VO2 max**; the specific adaptations (improved heart stroke volume, improved fat utilisation) occur here and not at faster paces. E is also what makes quality sessions recoverable: if you can't hold a conversation, you are compromising tomorrow's session.","structure":"1. The whole run is at E pace \u2014 ~5:25\u20136:08/km at VDOT 44\n2. No intervals, no surges, no tempo finishes\n3. Strides (see separate workout) can be added on one E day per week during Foundation","cues":"- Breathing should be conversational \u2014 you should be able to complete full sentences\n- Heart rate typically 65\u201378% of max; use that as a sanity check, not a target\n- If a pace feels like \"medium hard,\" you have drifted out of E. Slow down.\n- Terrain and weather shift pace by 10\u201320 sec/km \u2014 run by effort, not the watch","variations":"- **Foundation:** 3\u00d7 E runs per week (if daily running); for 3-day runners, E covers only long run + recovery pieces\n- **Early Quality / Race-Specific:** E fills warm-up + cool-down around quality\n- **Taper:** Maintain E runs at normal pace, drop total volume","sources":"- Jack Daniels, *Daniels' Running Formula* (4th ed., 2021, Human Kinetics) \u2014 E pace definition, % VO2 max table, 80/20 principle\n- [[Jack Daniels Running Formula]] \u2014 5 training paces table, weekly volume distribution\n- [Fellrnr \u2014 Jack Daniels reference](https://fellrnr.com/wiki/Jack_Daniels) \u2014 practical application notes\n\n---"},{"slug":"long-run","name":"Long run","category":"Aerobic endurance","zones":"E (mostly), optional M/HM finish","duration":"60\u2013150 min","why":"The long run is the single highest-yield session in a half-marathon build. It trains fatigue resistance (glycogen depletion tolerance, mitochondrial endurance), strengthens connective tissue, and teaches fuelling discipline. Daniels caps it at **25\u201330% of weekly mileage or 2.5 hours, whichever is less** \u2014 beyond that, injury risk rises faster than fitness gain.\n\n**Important nuance:** FIRST (Pierce/Murr/Moss) argues the long run for 3-day runners should NOT be a slow easy jog \u2014 it should be run 45\u201360 sec/mile slower than 10K pace for HM specificity. Daniels allows both: pure E for base-building phases, E with embedded M/HM segments for race-specific phases. Rob's plan blends the two.","structure":"**Base version (Foundation / recovery weeks):**\n\n1. Full run at E pace \u2014 ~5:25\u20136:08/km\n2. Distance 10\u201318 km depending on phase\n\n**Race-specific version (Race-Specific / Sharpen):**\n\n1. Start at E pace for first 60\u201370% of distance\n2. Middle or final section at M or HM goal pace (2\u20138 km depending on week)\n3. Last 1\u20132 km easy cool-down","cues":"- Fuel it \u2014 gel or carbs at 45+ min, water every 20 min once over 60 min\n- First half slower than second half (negative split) \u2014 don't start too fast\n- If the pace feels hard early, abandon the M/HM segment and finish easy\n- This is the session where consistency matters \u2014 miss one, miss the adaptation","variations":"- **Foundation:** 10\u201314 km pure E\n- **Early Quality:** 14\u201318 km E, last 2\u20133 km at M pace\n- **Race-Specific:** 16\u201320 km with 6\u201310 km at M/HM pace mid-run\n- **Taper (week \u22122):** 12\u201314 km easy\n- **Race week:** skip \u2014 race is the long effort","sources":"- Jack Daniels, *Daniels' Running Formula* (4th ed., 2021) \u2014 Long run cap (25\u201330% weekly or 2.5 hr), M-pace integration\n- Pierce, Murr, Moss, *Runner's World Run Less, Run Faster* (2021 ed.) \u2014 Long run pace prescription for 3-day runners (45\u201360 sec/mile slower than 10K)\n- [[FIRST 3-day Running Method]] \u2014 \"The long run in FIRST is NOT a slow easy jog\"\n- [[Training Phases - HM Periodisation]] \u2014 phase-specific long run structure\n\n---"},{"slug":"goal-pace-touch","name":"Goal pace touch","category":"Race-specific","zones":"E + M/HM goal","duration":"45\u201360 min","why":"Teach the legs what HM race pace feels like when fresh. Daniels places M-pace work in the Final Quality (sharpen) and Race-Specific phases specifically because **pacing is a neuromuscular skill** \u2014 runners who arrive at race day without practising goal pace consistently go out too fast. This session primes that skill without draining recovery; the volume at goal pace is deliberately short so the stress cost is low.","structure":"1. 4 km easy warm-up at E pace\n2. Main set: **2\u20133 km at HM goal pace** \u2014 4:44\u20134:49/km at VDOT 44 (M zone)\n3. 2 km easy cool-down at E pace\n\nTotal: ~8\u20139 km.","cues":"- Pace should feel \"controlled quick\" \u2014 not tempo-hard. If it's hard, it's too fast.\n- Breathing 3:3 or 2:2, not gasping\n- Check watch in the first 400m only, then lock it in by feel\n- If legs feel flat, drop to the slow end of the goal pace range. Don't force it.","variations":"- **Sharpen block (current):** 2\u20133 km at goal pace\n- **Race-Specific:** 5\u20138 km at goal pace, last 2 km M-pace finish\n- **Taper week \u22121:** 1\u20132 km at goal pace only \u2014 a \"pace check,\" not a workout\n- **Race week tune-up:** 2 km at goal pace, 2 days before race day","sources":"- Jack Daniels, *Daniels' Running Formula* (4th ed., 2021) \u2014 Ch. 7, goal-pace workouts, Final Quality phase design\n- [Coach Ray \u2014 Jack Daniels' Formulaic Approach to Periodisation](https://www.coachray.nz/2021/10/11/jack-daniels-phd-formulaic-approach-to-periodisation/) \u2014 M-pace specificity\n- [[Training Phases - HM Periodisation]] \u2014 Final Quality / Taper pace-tune-up timing\n- Mujika & Padilla, \"Scientific Bases for Precompetition Tapering Strategies,\" *Medicine & Science in Sports & Exercise* (2003) \u2014 taper intensity retention principle\n\n---"},{"slug":"short-intervals","name":"Short intervals","category":"Speed / economy","zones":"R (repetition)","duration":"45\u201355 min","why":"R-pace work targets running economy and neuromuscular efficiency \u2014 not VO2 max and not lactate threshold. Daniels defines R pace as **faster than 100% VO2 max**, which is why reps are kept short (200\u2013600m) with **full recovery** between them. The goal is to teach the legs to turn over fast without accumulating lactate. This is why R caps at **5% of weekly mileage or 8 km per session, whichever is less** \u2014 more than this crosses from \"economy work\" into \"glycolytic grind,\" which hurts recovery without improving the target system.","structure":"1. 2\u20134 km easy warm-up (E pace)\n2. Main set: **4\u20138 \u00d7 400m at R pace** \u2014 ~4:04/400m at VDOT 44 (1:37 per 400m)\n3. Recovery: 400m jog between each rep \u2014 full recovery, not rushed\n4. 2 km easy cool-down\n\nExample (Rob's current Week 01 KR2): 6E + 4\u00d7400m @ 4:22 + 2E. The 4:22 target here is conservative for his recent return-to-running context \u2014 Daniels table R-pace at VDOT 44 is 4:04.","cues":"- Each 400m should feel the **same effort** as the last \u2014 if rep 4 is slower than rep 1, you started too fast\n- Full recovery means your breathing returns to conversational before the next rep starts\n- Form first, pace second \u2014 short reps are also form drills\n- If pace drops >5 seconds between reps, stop early. R-pace reps that degrade teach bad pacing.","variations":"- **Early Quality:** 8\u00d7400m at R pace, progressing to 10\u00d7400m\n- **Sharpen (Rob's current):** 4\u00d7400m at a conservative pace (sub-R) \u2014 volume is the goal, not speed\n- **Race-Specific:** 6\u00d7600m at R pace\n- **Taper:** Skip R work; strides instead","sources":"- Jack Daniels, *Daniels' Running Formula* (4th ed., 2021) \u2014 R-pace definition, weekly cap (5% or 8 km), rep length (200\u2013600m), full recovery principle\n- [[Jack Daniels Running Formula]] \u2014 R session structure\n- Pierce, Murr, Moss, *Run Less, Run Faster* \u2014 Key Run 1 (Speed) structure (e.g. 6\u00d7800m at 5K pace, 400m jog recovery)\n- [Running with Rock \u2014 Training Explained: Jack Daniels Running Formula](https://runningwithrock.com/training-explained-jack-daniels-running-formula/) \u2014 rep cap rationale\n\n---"},{"slug":"cruise-intervals","name":"Cruise intervals","category":"Threshold","zones":"T","duration":"50\u201370 min","why":"Cruise intervals are Daniels' preferred threshold session \u2014 T-pace reps of **5\u201315 minutes with 1\u20133 minutes rest**. They deliver higher total volume at T pace than a continuous tempo run (fatigue builds more slowly when broken up), which is why they're the backbone of the Race-Specific phase for half-marathon. The target is **lactate clearance capacity** \u2014 the ability to run just below the threshold for extended periods, which is exactly what the back half of a hard HM demands.","structure":"1. 2 km easy warm-up (E pace)\n2. Main set: **4\u20135 \u00d7 1 km at T pace** \u2014 ~4:45/km at VDOT 44\n3. Recovery: 60 seconds jog/walk between reps (short rest is deliberate)\n4. 2 km easy cool-down","cues":"- T pace should feel \"comfortably hard\" \u2014 you could sustain it for ~1 hour in a race, but not relaxed\n- Short rest is the point \u2014 this is NOT a speed workout. Don't run the reps like R-pace.\n- If you can't hit the pace by rep 3, your T-pace estimate is off. Back the pace off, don't soldier on.\n- The last rep should feel the same as the first \u2014 even effort, not a fade","variations":"- **Early Quality:** 3\u00d71 km T + 1 km E + 2\u00d71 km T (split set, 1 km E between)\n- **Race-Specific (Rob's Part 2):** 4\u00d71 km T with 60s rest \u2192 5\u00d71 km T with 60s rest\n- **Taper (week \u22122):** 3\u00d71 km T \u2014 half volume, same intensity\n- **Taper (week \u22121):** 2\u00d71 km T only","sources":"- Jack Daniels, *Daniels' Running Formula* (4th ed., 2021) \u2014 Cruise interval protocol (T-pace, 5\u201315 min reps, 1\u20133 min rest)\n- [[Jack Daniels Running Formula]] \u2014 T-pace zone (88\u201392% VO2 max, ~1 hr sustainable)\n- [Fellrnr \u2014 Jack Daniels reference](https://fellrnr.com/wiki/Jack_Daniels) \u2014 cruise interval vs continuous tempo tradeoffs\n- [[Training Phases - HM Periodisation]] \u2014 T-work placement in Race-Specific phase\n\n---"},{"slug":"tempo-run","name":"Tempo run","category":"Threshold","zones":"T","duration":"40\u201360 min","why":"Continuous threshold effort \u2014 the classic \"tempo run.\" Same physiological target as cruise intervals (lactate clearance, sustained hard effort) but delivered as one unbroken block of 20\u201330 minutes at T pace. Daniels recommends cruise intervals over continuous tempo for most athletes because the total volume is higher, but tempo has its place: it trains **mental pacing discipline** in a way broken reps don't. Race effort is continuous, and the tempo run rehearses that.","structure":"1. 2 km easy warm-up (E pace)\n2. Main set: **20\u201330 min at T pace** \u2014 ~4:45/km at VDOT 44\n3. 1\u20132 km easy cool-down\n\nTotal: ~8\u201310 km.","cues":"- Pace should feel the same in minute 25 as in minute 5 \u2014 if it's getting faster, you started slow; if it's getting harder, you started too fast\n- This is the session where pacing discipline is built. Don't drift.\n- Breathe: 3:2 ratio typical. If it's 2:1, slow down.\n- No surge at the end. T pace all the way through.","variations":"- **Early Quality:** 15\u201320 min T pace (shorter)\n- **Race-Specific:** 25\u201330 min T pace (full)\n- **Sharpen:** Progression tempo \u2014 2 km at M pace, 3 km at T pace, 2 km at M pace\n- **Taper:** Skip full tempos; use cruise intervals instead","sources":"- Jack Daniels, *Daniels' Running Formula* (4th ed., 2021) \u2014 Tempo vs cruise interval tradeoffs\n- Pierce, Murr, Moss, *Run Less, Run Faster* \u2014 Key Run 2 (Tempo): 5 miles at HM goal pace; FIRST's tempo is goal-pace-specific rather than pure T-pace\n- [[FIRST 3-day Running Method]] \u2014 Key Run 2 tempo structure\n- Joe Friel, *The Triathlete's Training Bible* \u2014 pacing discipline rehearsal rationale\n\n---"},{"slug":"strides","name":"Strides","category":"Neuromuscular","zones":"R (brief)","duration":"+10 min onto an E run","why":"Strides are **not a workout** in the aerobic sense \u2014 they're neuromuscular priming. 20\u201330 seconds of fast, relaxed running with full recovery. They wake up the fast-twitch fibres, reinforce good form under speed, and cost almost nothing in recovery terms. Daniels uses them throughout Foundation (before quality starts) and Taper (to stay sharp on reduced volume). The rule: **fast but not anaerobic** \u2014 if you're gasping at the end of a stride, you went too hard.","structure":"1. Run your normal E session (6\u20138 km)\n2. In the last 2 km or after finishing: **4\u20136 \u00d7 20\u201330 seconds fast running**\n3. Full recovery between each (60\u201390 sec walking or easy jog)\n4. Finish with 200\u2013400m easy jog cool-down","cues":"- Think \"5K effort,\" not \"400m effort\" \u2014 quick but controlled\n- Focus on form: tall posture, relaxed shoulders, quick turnover, light footfall\n- If you're breathing hard at the end of a stride, slow down next time\n- Strides are a fluency drill. Do them regularly, they compound.","variations":"- **Foundation:** 4\u20136 strides after 1\u00d7 E run per week\n- **Early Quality:** 4 strides as part of the warm-up before R work\n- **Taper (race week):** 4\u00d730-sec strides 2 days before race \u2014 maintains sharpness, costs nothing","sources":"- Jack Daniels, *Daniels' Running Formula* (4th ed., 2021) \u2014 Strides protocol (6\u00d720 sec fast with full recovery)\n- [[Jack Daniels Running Formula]] \u2014 Strides in Foundation + Taper phases\n- [McMillan Running \u2014 strides guide](https://www.mcmillanrunning.com/) \u2014 fluency drill rationale\n- Pete Pfitzinger, *Advanced Marathoning* (3rd ed., 2019) \u2014 stride placement in taper\n\n---"},{"slug":"cross-training","name":"Cross-training","category":"Aerobic (non-impact)","zones":"E equivalent (HR-based)","duration":"30\u201360 min","why":"In FIRST's 3+2 structure, cross-training is what **replaces the 4 missing easy-run days**. Three runs alone don't deliver enough aerobic volume for half-marathon fitness; the cross-training days carry that load without the repetitive impact. The Furman research (Pierce/Murr/Moss) showed measurable VO2 max and lactate threshold improvements in runners who held to the 3+2 structure \u2014 but dropping the cross-training days is the single biggest failure mode of the programme.\n\n**HR is the anchor** \u2014 cross-training should feel like E pace, same heart rate range. Not recovery-easy, not threshold-hard. Steady aerobic.","structure":"Any of these for 30\u201360 minutes at E-equivalent heart rate:\n\n1. **Stationary bike** \u2014 zero impact, easy to hold HR steady\n2. **Swimming** \u2014 zero impact, adds upper body\n3. **Rowing** \u2014 aerobic + strength combined\n4. **Elliptical** \u2014 low-impact run simulation\n5. **Kettlebell circuit (home)** \u2014 what Rob uses. Aerobic format: 30s work / 30s rest, rotating swings / goblet squats / rows, 30\u201340 min.","cues":"- HR should match your E-pace HR range \u2014 same zone, different modality\n- No intervals, no max effort \u2014 this is aerobic volume, not a quality session\n- If you're breathing too hard, back off \u2014 you're cutting into recovery for the next run\n- 2 days per week minimum \u2014 dropping CT is how the programme breaks","variations":"- **Foundation:** 2\u00d730 min at easy aerobic HR\n- **Early Quality / Race-Specific:** 2\u00d745 min at easy aerobic HR\n- **Taper:** 1\u00d730 min only in race week, or rest","sources":"- Pierce, Murr, Moss, *Runner's World Run Less, Run Faster* (2021 ed.) \u2014 Cross-training prescription (30\u201360 min, easy-moderate, 2\u00d7 per week)\n- [Furman University \u2014 FIRST official](https://www.furman.edu/first/) \u2014 research results (VO2 max +4.2%, LT +2.3%)\n- [[FIRST 3-day Running Method]] \u2014 \"Cross-training is what makes 3-day running viable\"\n- [Laura Norris Running \u2014 Run Less Run Faster review](https://lauranorrisrunning.com/run-less-run-faster-review/) \u2014 CT-drop failure mode\n\n---"},{"slug":"race-day","name":"Race day","category":"Execution","zones":"HM pace (primary)","duration":"~1:43 target for VDOT 44","why":"Race day isn't a workout \u2014 it's the expression of every workout that came before it. Pacing and fuelling are what separate a finish time that matches the training from one that doesn't. Mujika & Padilla's tapering research (2003, *Medicine & Science in Sports & Exercise*) found that properly tapered athletes perform 2\u20133% better than under-tapered ones; the race-day protocol protects that taper gain by not burning it in the first 5 km.","structure":"**Pre-race (morning):**\n\n1. Wake ~3 hours before gun. Light breakfast (~400 kcal, low fibre, familiar food)\n2. Hydrate: 500 ml water + electrolyte over 2 hours\n3. Arrive 45 min before start. Toilet, bag drop, start pen.\n\n**Warm-up (15 min before start):**\n\n1. 5 min easy jog\n2. 4 \u00d7 30-sec strides at HM pace, full recovery\n3. Final toilet, into pen\n\n**Race:**\n\n1. **First 5 km:** HM goal pace minus 5 sec/km. Feel easy. Settle in.\n2. **5\u201315 km:** HM goal pace exactly (4:44\u20134:49/km at VDOT 44). Lock in.\n3. **15\u201320 km:** Hold pace. This is where the work shows.\n4. **Last 1.1 km:** Empty the tank. Negative split the final km.\n\n**Fuelling:**\n\n- Gel at 8 km and 15 km (if tolerated in training \u2014 never try a new gel on race day)\n- Water at every station; sip, don't chug","cues":"- First 3 km WILL feel too easy. That's correct. Do not race the people around you.\n- If the watch shows you 10 sec/km fast at 5 km, you are not fitter today \u2014 slow down now\n- Form check at 10 km and 16 km: tall, relaxed shoulders, quick cadence\n- Pain is expected from 17 km onwards. Separate \"discomfort\" from \"injury.\" Push through discomfort.\n- PacePro on the Forerunner 965 is preloaded with the course elevation profile \u2014 trust the watch's per-segment pace, not your average","variations":"- **C-race (HOKA 2026-05-03):** No taper \u2014 arrive from within the sharpen block. Goal is honest HM effort + a VDOT-recalibrating time, not a PB.\n- **A-race (Parramatta 2026-06-21):** Full taper complete. Race for time. Execute the plan above.\n- **B-race:** 3\u20135 day taper. Race strong but not all-out. Use as race-pace session with a bib.","sources":"- Mujika, I., & Padilla, S. (2003), \"Scientific Bases for Precompetition Tapering Strategies,\" *Medicine & Science in Sports & Exercise*, 35(7), 1182\u20131187 \u2014 2\u20133% performance improvement from proper taper\n- Jack Daniels, *Daniels' Running Formula* (4th ed., 2021), Ch. 11 \u2014 Race-day pacing\n- [McMillan Running \u2014 How to Taper for a Half Marathon](https://www.mcmillanrunning.com/) \u2014 taper execution\n- [[Training Phases - HM Periodisation]] \u2014 A/B/C race differentiation\n- Matt Fitzgerald, *80/20 Running* (2014) \u2014 negative split rationale\n- [Garmin \u2014 PacePro](https://www.garmin.com/) \u2014 Forerunner 965 course-specific pacing feature\n\n---"}]}/*<</DATA>>*/;
+
+// ---------------- Tabs ----------------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('tab-active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + name));
+}
+switchTab('dashboard');
+
+// ---------------- Header ----------------
+document.getElementById('header-subtitle').textContent = DATA.meta.date_display;
+document.getElementById('vdot-big').textContent = DATA.meta.vdot ?? '—';
+document.getElementById('footer-meta').textContent = 'Generated ' + DATA.meta.generated_at + ' · Refresh by running /running-publish';
+
+// ---------------- Race countdown ----------------
+const racesGrid = document.getElementById('races-grid');
+const upcomingRaces = DATA.races.filter(r => !r.is_past);
+if (upcomingRaces.length === 0) {
+  racesGrid.innerHTML = '<div class="card rounded-xl p-5 text-gray-500 text-sm md:col-span-2">No upcoming races. Add one in Races/.</div>';
+} else {
+  upcomingRaces.forEach(r => {
+    const priorityColor = r.priority === 'A' ? 'text-red-400' : r.priority === 'B' ? 'text-amber-400' : 'text-blue-400';
+    racesGrid.innerHTML += `
+      <div class="card rounded-xl p-5">
+        <div class="flex items-start justify-between mb-2">
+          <div>
+            <div class="text-xs ${priorityColor} font-semibold uppercase tracking-wide">${r.priority}-race · ${r.distance}</div>
+            <h3 class="font-semibold text-lg leading-tight mt-1">${escapeHtml(r.title)}</h3>
+          </div>
+          <div class="text-right">
+            <div class="text-3xl font-bold text-blue-400">${r.days}</div>
+            <div class="text-xs text-gray-500 uppercase">days</div>
+          </div>
+        </div>
+        <div class="flex items-center justify-between text-sm text-gray-400 mt-3">
+          <span>${r.date_display}</span>
+          ${r.predicted ? `<span>Predicted: <span class="text-white font-medium">${r.predicted}</span></span>` : ''}
+        </div>
+      </div>
+    `;
+  });
+}
+
+// ---------------- This week ----------------
+const tw = DATA.this_week;
+const weekDays = document.getElementById('week-days');
+if (!tw) {
+  weekDays.innerHTML = '<div class="col-span-7 text-gray-500 text-sm">No plan weeks found.</div>';
+  document.getElementById('week-subtitle').textContent = 'No plan loaded';
+} else {
+  document.getElementById('week-subtitle').textContent = `${tw.title} · Phase: ${tw.phase}`;
+  document.getElementById('week-sessions').textContent = `${tw.sessions_done}/${tw.sessions_planned}`;
+  document.getElementById('week-km').textContent = `${tw.actual_km} / ${tw.planned_km}`;
+
+  tw.days.forEach(d => {
+    const zoneClass = sessionToZone(d.session);
+    const statusIcon = d.status === 'completed' ? '✓'
+      : d.status === 'missed' ? '✕'
+      : d.status === 'today' ? '●'
+      : '';
+    const statusColor = d.status === 'completed' ? 'text-green-400'
+      : d.status === 'missed' ? 'text-red-400'
+      : d.status === 'today' ? 'text-blue-400'
+      : 'text-gray-600';
+    const clickable = d.workout_slug ? `data-workout="${escapeHtml(d.workout_slug)}" class="card rounded-lg p-2 text-xs cursor-pointer hover:border-blue-500"` : 'class="card rounded-lg p-2 text-xs"';
+    weekDays.innerHTML += `
+      <div ${clickable} title="${escapeHtml(d.planned)}${d.workout_slug ? ' — click for detail' : ''}">
+        <div class="flex justify-between items-center mb-1">
+          <span class="text-gray-500">${d.day}</span>
+          <span class="${statusColor} font-bold">${statusIcon}</span>
+        </div>
+        <div class="text-gray-400 mb-1">${d.date_display}</div>
+        <div class="h-1.5 rounded ${zoneClass} mb-1"></div>
+        <div class="font-medium truncate">${escapeHtml(truncate(d.planned, 22))}</div>
+        ${d.actual ? `<div class="text-gray-500 mt-1">${d.actual.distance_km.toFixed(1)} km · ${d.actual.pace}</div>` : ''}
+      </div>
+    `;
+  });
+}
+
+// ---------------- Next sessions ----------------
+const nextEl = document.getElementById('next-sessions');
+if (DATA.next_sessions.length === 0) {
+  nextEl.innerHTML = '<div class="text-gray-500 text-sm">No upcoming sessions.</div>';
+} else {
+  DATA.next_sessions.slice(0,3).forEach(s => {
+    const attrs = s.workout_slug ? `data-workout="${escapeHtml(s.workout_slug)}" class="flex items-center gap-4 py-2 cursor-pointer hover:bg-gray-900 rounded-lg px-2 -mx-2"` : 'class="flex items-center gap-4 py-2"';
+    nextEl.innerHTML += `
+      <div ${attrs}>
+        <div class="w-16 text-center shrink-0">
+          <div class="text-xs text-gray-500 uppercase">${s.day}</div>
+          <div class="font-bold">${s.date_display.split(' ').slice(1).join(' ')}</div>
+        </div>
+        <div class="h-10 w-1 rounded ${sessionToZone(s.session)}"></div>
+        <div class="flex-1 min-w-0">
+          <div class="font-medium">${escapeHtml(s.session)}</div>
+          <div class="text-xs text-gray-500">${escapeHtml(s.distance)} · ${escapeHtml(s.pace)}${s.workout_slug ? ' · <span class="text-blue-400">detail →</span>' : ''}</div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// ---------------- Volume chart ----------------
+if (DATA.weekly_volumes.labels.length > 0) {
+  document.getElementById('volume-meta').textContent =
+    `${DATA.weekly_volumes.weeks_count} weeks · ${DATA.weekly_volumes.total_km} km total · avg ${DATA.weekly_volumes.avg_km} km · ${DATA.weekly_volumes.source}`;
+  new Chart(document.getElementById('chart-volume'), {
+    type: 'bar',
+    data: {
+      labels: DATA.weekly_volumes.labels,
+      datasets: [{
+        label: 'km',
+        data: DATA.weekly_volumes.values,
+        backgroundColor: '#3B82F6',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } },
+      }
+    }
+  });
+} else {
+  document.getElementById('volume-meta').textContent = 'No weekly data yet.';
+}
+
+// ---------------- Recent activities ----------------
+const recentEl = document.getElementById('recent-activities');
+if (DATA.activities.length === 0) {
+  recentEl.innerHTML = '<div class="text-gray-500 text-sm py-2">No activities yet. Drop FIT files into Raw/FIT/ and run /running-sync.</div>';
+} else {
+  DATA.activities.slice(0,8).forEach(a => {
+    recentEl.innerHTML += `
+      <div class="flex items-center gap-3 py-3">
+        <div class="h-8 w-1 rounded ${sessionToZone(a.type)}"></div>
+        <div class="w-24 shrink-0">
+          <div class="text-sm font-medium">${a.date_display}</div>
+          <div class="text-xs text-gray-500 capitalize">${escapeHtml(a.type)}</div>
+        </div>
+        <div class="flex-1 min-w-0 grid grid-cols-3 gap-2 text-sm">
+          <div>
+            <div class="font-bold">${a.distance_km.toFixed(2)}</div>
+            <div class="text-xs text-gray-500">km</div>
+          </div>
+          <div>
+            <div class="font-bold">${escapeHtml(a.pace)}</div>
+            <div class="text-xs text-gray-500">pace</div>
+          </div>
+          <div>
+            <div class="font-bold">${escapeHtml(a.hr)}</div>
+            <div class="text-xs text-gray-500">avg HR</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// ---------------- Calendar ----------------
+const cal = DATA.calendar;
+document.getElementById('calendar-title').textContent = cal.month_display;
+const calGrid = document.getElementById('calendar-grid');
+const calActuals = {};
+cal.days.forEach(d => { if (d.actual) calActuals[d.date] = d.actual; });
+cal.days.forEach(d => {
+  const zone = d.is_race ? 'zone-Race' : (d.planned ? sessionToZone(d.planned.session) : '');
+  const dim = d.in_month ? '' : 'opacity-30';
+  const todayRing = d.is_today ? 'ring-2 ring-blue-500' : '';
+  const slug = d.planned && d.planned.workout_slug;
+  const hasActual = !!d.actual;
+  let calAttrs;
+  if (hasActual) {
+    calAttrs = `data-date="${d.date}" class="card rounded-lg p-1.5 calendar-day ${dim} ${todayRing} cursor-pointer hover:border-green-500"`;
+  } else if (slug) {
+    calAttrs = `data-workout="${escapeHtml(slug)}" class="card rounded-lg p-1.5 calendar-day ${dim} ${todayRing} cursor-pointer hover:border-blue-500"`;
+  } else {
+    calAttrs = `class="card rounded-lg p-1.5 calendar-day ${dim} ${todayRing}"`;
+  }
+  const title = d.is_race ? d.race_title : (d.planned ? `${d.planned.session} · ${d.planned.distance}` : '');
+  calGrid.innerHTML += `
+    <div ${calAttrs} title="${escapeHtml(title)}">
+      <div class="flex justify-between items-start text-xs mb-1">
+        <span class="${d.is_today ? 'text-blue-400 font-bold' : 'text-gray-400'}">${d.day_num}</span>
+        ${hasActual ? '<span class="text-green-400 text-[9px] font-bold">✓</span>' : ''}
+      </div>
+      ${zone ? `<div class="h-0.5 rounded ${zone} mb-1"></div>` : ''}
+      ${hasActual ? `
+        <div class="text-xs font-semibold text-white leading-snug">${d.actual.distance_km.toFixed(1)} km</div>
+        <div class="text-[9px] text-gray-400 leading-tight">${escapeHtml(d.actual.pace)}</div>
+        ${d.actual.elapsed && d.actual.elapsed !== '—' ? `<div class="text-[9px] text-gray-500">${escapeHtml(d.actual.elapsed)}</div>` : ''}
+      ` : d.planned ? `<div class="text-[10px] leading-tight text-gray-300 truncate">${escapeHtml(truncate(d.planned.session, 14))}</div>` : ''}
+      ${d.is_race ? `<div class="text-[10px] text-amber-400 font-bold">RACE</div>` : ''}
+    </div>
+  `;
+});
+calGrid.addEventListener('click', e => {
+  const tile = e.target.closest('[data-date]');
+  if (!tile) return;
+  const a = calActuals[tile.dataset.date];
+  if (a) openActModal(a, tile.dataset.date);
+});
+function openActModal(a, dateKey) {
+  const typeLabel = a.type ? a.type.charAt(0).toUpperCase() + a.type.slice(1) : 'Run';
+  const [y, m, day] = (dateKey || '').split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dateStr = dateKey ? `${parseInt(day)} ${months[parseInt(m)-1]} ${y}` : '';
+  document.getElementById('act-modal-content').innerHTML = `
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <div class="text-sm font-semibold text-white">${escapeHtml(dateStr)}</div>
+        <div class="text-xs text-gray-500 capitalize">${escapeHtml(typeLabel)}</div>
+      </div>
+      <div class="h-8 w-1 rounded ${sessionToZone(a.type)}"></div>
+    </div>
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="text-center">
+        <div class="text-xl font-bold text-white">${a.distance_km.toFixed(2)}</div>
+        <div class="text-[10px] text-gray-500 mt-0.5">km</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xl font-bold text-white">${escapeHtml(a.pace)}</div>
+        <div class="text-[10px] text-gray-500 mt-0.5">avg pace</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xl font-bold text-white">${escapeHtml(a.elapsed || '—')}</div>
+        <div class="text-[10px] text-gray-500 mt-0.5">time</div>
+      </div>
+    </div>
+    ${a.hr && a.hr !== '—' ? `<div class="text-xs text-gray-500 text-center">Avg HR: <span class="text-gray-300">${escapeHtml(String(a.hr))}</span></div>` : ''}
+  `;
+  document.getElementById('act-modal').classList.remove('hidden');
+}
+function closeActModal() {
+  document.getElementById('act-modal').classList.add('hidden');
+}
+document.getElementById('act-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('act-modal')) closeActModal();
+});
+
+// ---------------- Plan ----------------
+const planOverview = document.getElementById('plan-overview');
+if (DATA.plan.overview) {
+  const ov = DATA.plan.overview;
+  planOverview.innerHTML = `
+    <h2 class="text-lg font-semibold mb-1">${escapeHtml(ov.target_race || 'Current Plan')}</h2>
+    ${ov.race_date ? `<p class="text-xs text-gray-500 mb-3">A-race: ${ov.race_date}</p>` : ''}
+    <div class="text-sm text-gray-300 mb-5 leading-relaxed">${renderMarkdown(ov.body || '')}</div>
+    ${ov.part1 ? `<div class="mb-5">
+      <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wide mb-2">Part 1 — HOKA Sharpen Block</h3>
+      <div class="text-sm text-gray-300">${renderMarkdownWithTables(ov.part1)}</div>
+    </div>` : ''}
+    ${ov.part2 ? `<div>
+      <h3 class="text-sm font-semibold text-green-400 uppercase tracking-wide mb-2">Part 2 — Parramatta Build</h3>
+      <div class="text-sm text-gray-300">${renderMarkdownWithTables(ov.part2)}</div>
+    </div>` : ''}
+  `;
+} else {
+  planOverview.innerHTML = '<div class="text-gray-500 text-sm">No current plan found.</div>';
+}
+
+const planWeeks = document.getElementById('plan-weeks');
+DATA.plan.weeks.forEach(wk => {
+  const highlight = wk.is_current ? 'border-blue-500' : wk.is_past ? 'opacity-50' : '';
+  const badge = wk.is_current
+    ? '<span class="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">This week</span>'
+    : wk.is_past ? '<span class="text-xs bg-gray-700 text-gray-400 px-2 py-0.5 rounded-full">Past</span>' : '';
+  const sessionsHtml = wk.sessions.map(s => {
+    const attrs = s.workout_slug ? `data-workout="${escapeHtml(s.workout_slug)}" class="flex items-center gap-2 text-sm py-1 cursor-pointer hover:bg-gray-900 rounded px-1 -mx-1"` : 'class="flex items-center gap-2 text-sm py-1"';
+    return `
+    <div ${attrs}>
+      <span class="w-10 text-xs text-gray-500">${s.day}</span>
+      <span class="h-4 w-1 rounded ${sessionToZone(s.session)}"></span>
+      <span class="flex-1">${escapeHtml(s.session)}${s.workout_slug ? ' <span class="text-blue-400 text-xs">→</span>' : ''}</span>
+      <span class="text-xs text-gray-500">${escapeHtml(s.distance)}</span>
+    </div>
+  `;
+  }).join('');
+  planWeeks.innerHTML += `
+    <details class="card rounded-xl p-4 border ${highlight}" ${wk.is_current ? 'open' : ''}>
+      <summary class="flex items-center justify-between cursor-pointer list-none">
+        <div>
+          <div class="font-semibold">${escapeHtml(wk.title)}</div>
+          <div class="text-xs text-gray-500">${wk.week_of_display} – ${wk.week_end_display} · ${escapeHtml(wk.phase)} · ${wk.planned_km} km</div>
+        </div>
+        <div class="flex items-center gap-2">${badge}<span class="text-gray-500">▾</span></div>
+      </summary>
+      <div class="mt-3 pt-3 border-t border-gray-800">${sessionsHtml || '<div class="text-xs text-gray-500">No sessions.</div>'}</div>
+    </details>
+  `;
+});
+
+// ---------------- Metrics ----------------
+// VDOT chart
+if (DATA.vdot_history.values.length > 0) {
+  new Chart(document.getElementById('chart-vdot'), {
+    type: 'line',
+    data: {
+      labels: DATA.vdot_history.labels,
+      datasets: [{
+        label: 'VDOT',
+        data: DATA.vdot_history.values,
+        borderColor: '#3B82F6',
+        backgroundColor: 'rgba(59,130,246,0.15)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 6,
+        pointBackgroundColor: '#3B82F6',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          min: DATA.vdot_history.current - 5,
+          max: DATA.vdot_history.current + 5,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#9CA3AF' },
+        },
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } },
+      }
+    }
+  });
+}
+
+// Pace zones
+const paceZonesEl = document.getElementById('pace-zones');
+if (DATA.pace_zones.length === 0) {
+  paceZonesEl.innerHTML = '<div class="text-gray-500 text-sm">No pace zones set. Run /running-onboarding.</div>';
+} else {
+  DATA.pace_zones.forEach(z => {
+    paceZonesEl.innerHTML += `
+      <div class="flex items-center gap-3">
+        <div class="w-6 h-6 rounded flex items-center justify-center font-bold text-white text-xs" style="background:${z.colour}">${z.code}</div>
+        <div class="flex-1">
+          <div class="font-medium text-sm">${escapeHtml(z.label)}</div>
+          <div class="text-xs text-gray-500">${escapeHtml(z.use)}</div>
+        </div>
+        <div class="font-mono text-sm text-blue-400">${escapeHtml(z.pace)}/km</div>
+      </div>
+    `;
+  });
+}
+
+// Predicted times
+const predEl = document.getElementById('predicted-times');
+if (DATA.races.length === 0) {
+  predEl.innerHTML = '<div class="text-gray-500 text-sm md:col-span-2">No races configured.</div>';
+} else {
+  DATA.races.filter(r => r.predicted).forEach(r => {
+    predEl.innerHTML += `
+      <div class="flex items-center justify-between bg-gray-900 rounded-lg p-3">
+        <div>
+          <div class="font-medium text-sm">${escapeHtml(r.title)}</div>
+          <div class="text-xs text-gray-500">${escapeHtml(r.distance)} · ${r.date_display}</div>
+        </div>
+        <div class="text-xl font-bold text-blue-400 font-mono">${escapeHtml(r.predicted)}</div>
+      </div>
+    `;
+  });
+}
+
+// ---------------- Training sessions ----------------
+const workoutsList = document.getElementById('workouts-list');
+const workoutsBySlug = {};
+(DATA.workouts || []).forEach(w => { workoutsBySlug[w.slug] = w; });
+
+if (!DATA.workouts || DATA.workouts.length === 0) {
+  workoutsList.innerHTML = '<div class="card rounded-xl p-5 text-gray-500 text-sm">No workouts found. Create Running/Workouts.md with entries like ## Easy run.</div>';
+} else {
+  DATA.workouts.forEach(w => {
+    const zoneChips = (w.zones || '').split(/[,/]/).map(z => z.trim()).filter(Boolean).slice(0,4).map(z => {
+      const cls = 'zone-' + z.replace(/[^A-Za-z]/g, '').charAt(0).toUpperCase();
+      return `<span class="inline-flex items-center justify-center w-6 h-6 rounded text-white text-xs font-bold ${cls}">${escapeHtml(z.charAt(0))}</span>`;
+    }).join(' ');
+    workoutsList.innerHTML += `
+      <div id="workout-${escapeHtml(w.slug)}" class="card rounded-xl p-5 scroll-mt-4 transition">
+        <div class="flex items-start justify-between gap-4 flex-wrap mb-4 pb-3 border-b border-gray-800">
+          <div class="min-w-0">
+            <h3 class="font-semibold text-xl">${escapeHtml(w.name)}</h3>
+            <div class="text-xs text-gray-500 mt-1">${escapeHtml(w.category)} · ${escapeHtml(w.zones)} · ${escapeHtml(w.duration)}</div>
+          </div>
+          <div class="flex gap-1">${zoneChips}</div>
+        </div>
+        <div class="space-y-4 text-sm">
+          ${workoutSection('Why', w.why)}
+          ${workoutSection('Structure', w.structure)}
+          ${workoutSection('Cues', w.cues)}
+          ${workoutSection('Variations', w.variations)}
+          <div class="pt-3 border-t border-gray-800">
+            <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">Sources</div>
+            <div class="text-xs text-gray-500 leading-relaxed">${renderMarkdown(w.sources)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+function workoutSection(label, body) {
+  if (!body) return '';
+  return `
+    <div>
+      <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">${label}</div>
+      <div class="text-gray-300 leading-relaxed">${renderMarkdown(body)}</div>
+    </div>
+  `;
+}
+
+function renderMarkdown(s) {
+  if (!s) return '';
+  let text = escapeHtml(s);
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong class="text-gray-100">$1</strong>');
+  text = text.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-blue-400 hover:underline">$1</a>');
+  text = text.replace(/\[\[([^\]]+)\]\]/g, '<span class="text-blue-400">$1</span>');
+  return '<div class="whitespace-pre-wrap">' + text + '</div>';
+}
+
+function renderMarkdownWithTables(s) {
+  if (!s) return '';
+  // Split into table blocks and non-table blocks
+  const lines = s.split('\n');
+  const blocks = [];
+  let tableLines = [];
+  let textLines = [];
+
+  const isTableRow = l => l.trim().startsWith('|');
+  const isSeparator = l => /^\|[-| :]+\|/.test(l.trim());
+
+  for (const line of lines) {
+    if (isTableRow(line)) {
+      if (textLines.length) { blocks.push({type:'text', content: textLines.join('\n')}); textLines = []; }
+      tableLines.push(line);
+    } else {
+      if (tableLines.length) { blocks.push({type:'table', content: tableLines}); tableLines = []; }
+      textLines.push(line);
+    }
+  }
+  if (tableLines.length) blocks.push({type:'table', content: tableLines});
+  if (textLines.length) blocks.push({type:'text', content: textLines.join('\n')});
+
+  return blocks.map(b => {
+    if (b.type === 'text') return renderMarkdown(b.content);
+    // Render markdown table
+    const rows = b.content.filter(l => !isSeparator(l));
+    if (rows.length < 2) return renderMarkdown(b.content.join('\n'));
+    const parseCells = l => l.split('|').slice(1,-1).map(c => c.trim());
+    const headers = parseCells(rows[0]).map(h =>
+      `<th class="px-3 py-1.5 text-left text-xs font-semibold text-gray-400 uppercase border-b border-gray-700">${escapeHtml(h)}</th>`
+    ).join('');
+    const bodyRows = rows.slice(1).map(r => {
+      const cells = parseCells(r).map((c,i) => {
+        let cls = 'px-3 py-1.5 text-xs border-b border-gray-800 text-gray-300';
+        // Colour the Phase and session cells
+        if (c.toLowerCase().includes('sharpen') || c.toLowerCase().includes('taper')) cls += ' text-blue-300';
+        else if (c.toLowerCase().includes('race-specific') || c.toLowerCase().includes('race week')) cls += ' text-amber-300';
+        else if (c.toLowerCase().includes('quality') || c.toLowerCase().includes('recovery')) cls += ' text-green-300';
+        return `<td class="${cls}">${escapeHtml(c)}</td>`;
+      }).join('');
+      return `<tr class="hover:bg-gray-900">${cells}</tr>`;
+    }).join('');
+    return `<div class="overflow-x-auto my-3"><table class="w-full text-left border-collapse"><thead><tr>${headers}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+  }).join('');
+}
+
+// ---------------- Workout click navigation ----------------
+function gotoWorkout(slug) {
+  if (!slug || !workoutsBySlug[slug]) return;
+  switchTab('training');
+  const el = document.getElementById('workout-' + slug);
+  if (!el) return;
+  // Wait for tab panel to become visible before scrolling
+  requestAnimationFrame(() => {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.style.boxShadow = '0 0 0 2px #3b82f6';
+    setTimeout(() => { el.style.boxShadow = ''; }, 1500);
+  });
+}
+
+// Delegate clicks from any [data-workout] element
+document.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-workout]');
+  if (target && target.dataset.workout) {
+    e.preventDefault();
+    gotoWorkout(target.dataset.workout);
+  }
+});
+
+// ---------------- Utilities ----------------
+function sessionToZone(session) {
+  if (!session) return '';
+  const s = session.toLowerCase();
+  if (s.includes('rest')) return 'zone-Rest';
+  if (s.includes('race')) return 'zone-Race';
+  if (s.includes('cross') || s.includes('x-train') || s.includes('kb')) return 'zone-X';
+  if (s.includes('long')) return 'zone-E';
+  if (s.includes('tempo') || s.includes('threshold') || s.includes(' t ') || s.startsWith('t ')) return 'zone-T';
+  if (s.includes('interval') || s.includes('vo2')) return 'zone-I';
+  if (s.includes('rep') || s.includes('400m') || s.includes('200m') || s.includes('stride')) return 'zone-R';
+  if (s.includes('marathon') || s.includes(' m ')) return 'zone-M';
+  if (s.includes('easy') || s.includes('recovery')) return 'zone-E';
+  if (s.includes('goal pace')) return 'zone-M';
+  return 'zone-E';
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function truncate(s, n) {
+  s = String(s ?? '');
+  return s.length > n ? s.slice(0, n-1) + '…' : s;
+}
+</script>
+</body>
+</html>
